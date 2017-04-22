@@ -3,7 +3,7 @@
 -- http://www.phpmyadmin.net
 --
 -- Host: 127.0.0.1
--- Generation Time: Apr 22, 2017 at 04:42 PM
+-- Generation Time: Apr 22, 2017 at 05:24 PM
 -- Server version: 10.1.10-MariaDB
 -- PHP Version: 5.6.19
 
@@ -63,9 +63,11 @@ INSERT INTO `game` (`player_id`, `gamer_tag`, `email`, `password`, `current_room
 
 CREATE TABLE `items` (
   `item_id` varchar(5) NOT NULL,
+  `name` varchar(16) NOT NULL,
   `description` varchar(1024) NOT NULL,
   `cmd` varchar(1024) NOT NULL,
-  `image` varchar(64) NOT NULL
+  `image` varchar(64) NOT NULL,
+  `do` int(11) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
 -- --------------------------------------------------------
@@ -76,11 +78,13 @@ CREATE TABLE `items` (
 
 CREATE TABLE `monsters` (
   `monster_id` varchar(5) NOT NULL,
+  `name` varchar(16) NOT NULL,
   `description` varchar(2048) NOT NULL,
   `img` varchar(16) NOT NULL,
   `cmd` varchar(1024) NOT NULL,
   `hp` int(4) NOT NULL,
-  `attack` int(4) NOT NULL
+  `attack` int(4) NOT NULL,
+  `item` varchar(5) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
 -- --------------------------------------------------------
