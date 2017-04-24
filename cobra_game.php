@@ -4,6 +4,39 @@ include_once 'includes/cobra.php';
 
 sec_session_start();
 
+include 'includes/cobra.querys.php';
+//get the game status
+//$stmt = $mysqli->query("SELECT current_room, hp, money, weapon, head, chest, hands, legs, ci_array, pi_array, hi_array, rm_array, dracula, moves FROM game WHERE email = " . $ . " LIMIT 1");
+if($stmt = $mysqli->prepare("SELECT current_room, hp, money, weapon, head, chest, hands, legs, ci_array, pi_array, hi_array, rm_array, dracula, moves FROM game WHERE email = ? LIMIT 1"))
+{
+	$stmt->bind_param('s', $_SESSION['email']);
+	$stmt->execute();
+	$stmt->store_result();
+	$stmt->bind_result($current_room, $hp, $money, $weapon, $head, $chest, $hands, $legs, $ci_array, $pi_array, $hi_array, $rm_array, $dracula, $moves);
+	$stmt->fetch();
+	$stmt->close();
+}
+
+if($stmt2 = $mysqli->prepare("SELECT name, description, secondary, img, cmds, doors, monster, item FROM rooms WHERE room_id = ? LIMIT 1"))
+{
+	$stmt2->bind_param('s', $current_room);
+	$stmt2->execute();
+	$stmt2->store_result();
+	$stmt2->bind_result($room_name,$description,$secondary,$img_room,$room_cmds,$doors,$monster,$item);
+	$stmt2->fetch();
+	$stmt2->close();
+}
+if ($item != '')
+{
+	$stmt3 = $mysqli->query("SELECT * FROM items WHERE $item");
+	
+}
+$stmt4 = $mysqli->query("SELECT * FROM items WHERE item_id LIKE 'ci_%'");
+$stmt5 = $mysqli->query("SELECT * FROM rooms WHERE $doors");
+//populate game board with vars
+//if for monster
+//if for puzzle
+//if for item
 ?>
 <!doctype html>
 <html lang="en">
@@ -49,10 +82,61 @@ sec_session_start();
 					menu.hidden= false;
 				}
 		}
+		function showItems()
+		{
+			var the_items = document.getElementById("item_div");
+			var the_items_button = document.getElementById("items_button");
+			//var the_items_pickup = document.getElementById("items_pickup");
+			the_items.hidden = false;
+			the_items_button.display = 'none';
+		}
+		function pickup(item_id)
+		{
+			if (item_id.substring(0, 2) == 'ci')
+				{
+					var ci = document.getElementById('ci_array');
+					var modal = document.getElementById(item_id+'m');
+					modal.hidden=true;
+					var array_id = item_id.substring(3);
+					var array = ci.split(",");
+					array[array_id] = "1";
+				}
+			if (item_id.substring(0, 2) == 'pi')
+				{
+					var pi = document.getElementById('pi_array');
+					var modal = document.getElementById(item_id+'m');
+					modal.hidden=true;
+					var array_id = item_id.substring(3);
+					var array = pi.value.split(',');
+					array[array_id-1] = "1";
+					alert(array);
+					pi.value = array.toString();
+					alert(pi.value);
+					
+				}
+			if (item_id.substring(0, 2) == 'hi')
+				{
+					var hi = document.getElementById('hi_array');
+					var modal = document.getElementById(item_id+'m');
+					modal.hidden=true;
+					var array_id = Number(item_id.substring(3));
+					var array = hi.split(",");
+					array[array_id] = "1";
+					
+				}
+		}
+		function goto(room)
+		{
+			var current_room = document.getElementById('current_room');
+			current_room.value = room;
+			form.submit();
+			
+		}
 	</script>
 </head>
 
 <body>
+
 <?php if (login_check($mysqli) == true) : ?>
 	<div class="container-fluid" >
 		<div class="row" style="margin-left: 20%;">
@@ -66,13 +150,101 @@ sec_session_start();
 				<!-- Veiwing Window -->
 				<div class="row thumbnail" style="height:500px;">
 					<div class="col-xs-12">
-						this is the viewing window
+						<?php
+							echo "<p>" . $description .  "</p>";
+							if($item != '')
+							{
+								echo "<div id='item_div' hidden='true'>";
+								if ($stmt3->num_rows !=0)
+								{
+									while($rows = $stmt3->fetch_assoc())
+									{
+										$item_id = $rows['item_id'];
+										$item_name = $rows['name'];
+										$item_description= $rows['description'];
+										$item_cmd = $rows['cmd'];
+										$item_id_click = "'".$item_id."'";
+
+										echo'<button type="button" class="btn btn-primary" data-toggle="modal" id="'.$item_id.'m" data-target="#'.$item_id.'">'.$item_name.'</button>
+											<!-- '.$item_name.' -->
+											<div class="modal fade" id="'.$item_id.'" tabindex="-1" role="dialog" aria-labelledby="myModalLabel">
+												<div class="modal-dialog" role="document">
+													<div class="modal-content">
+														<div class="modal-header">
+															<button type="button" class="close" data-dismiss="modal" aria-label="Close">
+																<span aria-hidden="true">&times;</span>
+															</button>
+															<h4 class="modal-title" id="myModalLabel">
+																'.$item_name.'
+															</h4>
+														</div>
+														<div class="modal-body">
+														<div class="row">
+															<div class="col-xs-8">
+																'.$item_description.'
+																<input type="text" hidden="true" value="'.$item_id.'"
+															</div>
+														</div>
+														<div class="modal-footer">
+															<button type="button" class="btn btn-primary" onClick="pickup('.$item_id_click.')" data-dismiss="modal"> Pick up item</button>
+															<button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+														</div>
+														</div>
+													</div>
+												</div>
+											</div>
+										</div>';
+									}
+								}
+								echo "</div>";
+							}
+						?>
 					</div>
 				</div>
 				<!-- Command Window -->
 				<div class="row thumbnail" style="height:200px;">
 					<div class="col-xs-12">
-						Cmmd window
+					<form role="form" action="includes/cobra.run.php" method="post" name="room_change">
+	<input type="text" name="current_room" id="current_room" value="<?php echo $cr; ?>" hidden="true">
+	<input type="text" name="hp" id="hp" value="<?php echo $hp; ?>" hidden="true">
+	<input type="text" name="money" id="money" value="<?php echo $money; ?>" hidden="true">
+	<input type="text" name="weapon" id="weapon" value="<?php echo $weapon; ?>" hidden="true">
+	<input type="text" name="head" id="head" value="<?php echo $head; ?>" hidden="true">
+	<input type="text" name="chest" id="chest" value="<?php echo $chest; ?>" hidden="true">
+	<input type="text" name="hands" id="hands" value="<?php echo $hands; ?>" hidden="true">
+	<input type="text" name="legs" id="legs" value="<?php echo $legs; ?>" hidden="true">
+	<input type="text" name="ci_array" id="ci_array" value="<?php echo $ci_array; ?>" hidden="true">
+	<input type="text" name="pi_array" id="pi_array" value="<?php echo $pi_array; ?>" hidden="true">
+	<input type="text" name="hi_array" id="hi_array" value="<?php echo $hi_array; ?>" hidden="true">
+	<input type="text" name="rm_array" id="rm_array" value="<?php echo $rm_array; ?>" hidden="true">
+	<input type="text" name="dracula" id="dracula" value="<?php echo $dracula; ?>" hidden="true">
+	<input type="text" name="moves" id="moves" value="<?php echo $moves; ?>" hidden="true">
+	<input type="text" name="email" value="<?php echo($_SESSION['email']);?>" hidden="true">
+
+<?php 
+	//if($monster != '')
+	if($item != '')
+	{
+		
+		echo('<input type="button" class="btn btn-default" name="items_button" id="items_button" onClick="showItems()" hidden="true" value="Look for Items">');
+	}
+	if ($stmt5->num_rows !=0)
+		{
+			while($rows = $stmt5->fetch_assoc())
+			{
+				$room_id = $rows['room_id'];
+				$room_name = $rows['name'];
+				$room_id_string = "'".$room_id."'";
+				echo '<button type="submit" class="btn btn-default" id="'.$room_id.'" onClick="goto('.$room_id_string.')" hidden="true" value="">go to '.$room_name.'</button>';
+				
+
+				
+			}
+		}					
+
+	
+?>
+				</form>
 					</div>
 				</div>
 			</div>
@@ -81,7 +253,7 @@ sec_session_start();
 				<!-- Map Window -->
 				<div class="row thumbnail">
 					<div class="col-xs-12" style="height:275px;">
-						<img src="/tcinet/Images/F4R1.png" style="width: 100%;">
+						<img src="/tcinet/Images/cobra/<?php echo $img_room;?>" style="width: 100%;">
 					</div>
 				</div>
 				<!-- Status Display -->
@@ -116,7 +288,7 @@ sec_session_start();
 									</div>
 									<div class="col-xs-7">
 										<div class="progress">
-											<div class="progress-bar progress-bar-danger" role="progressbar" aria-valuenow="40" aria-valuemin="0" aria-valuemax="100" style="width: <?php echo (int)$hp/100; ?>%;">
+											<div class="progress-bar progress-bar-<?php if($hp >=60) echo "success"; if($hp <60 && $hp >=30) echo "warning"; if($hp<30) echo"danger"; ?>" role="progressbar" aria-valuenow="40" aria-valuemin="0" aria-valuemax="100" style="width: <?php echo $hp; ?>%;">
 												<span class="sr-only">100%</span>
 												<?php echo $hp; ?>
 											</div>
@@ -134,7 +306,7 @@ sec_session_start();
 										
 									</div>
 									<div class="col-xs-2">
-										20
+										<input type="text" disabled="true" id="player_attack" value="Base:10">
 									</div>
 								</div>
 								<div class="row">
@@ -145,7 +317,7 @@ sec_session_start();
 										
 									</div>
 									<div class="col-xs-2">
-										10
+										<input type="text" disabled="true" id="player_attack" value="Base:10">
 									</div>
 								</div>
 								<div class="row">
@@ -177,233 +349,76 @@ sec_session_start();
 									</div>
 									<div class="col-xs-7">
 										<div class="progress">
-											<div class="progress-bar progress-bar" role="progressbar" aria-valuenow="40" aria-valuemin="0" aria-valuemax="100" style="width: 15%;">
+											<div class="progress-bar progress-bar" role="progressbar" aria-valuenow="40" aria-valuemin="0" aria-valuemax="100" style="width: 0%;">
 												<span class="sr-only">1/7</span>
 											</div>
 										</div>
 									</div>
 									<div class="col-xs-2">
-										1/7
+										0/7
 									</div>
 								</div>
 								<div class="row">
-									<div class="col-xs-4">
-										<button type="button" class="btn btn-primary btn-group-justified" data-toggle="modal" data-target="#curesitem1"><span class="glyphicon glyphicon-apple"></span></button>
-										<!-- Modal Cure Item 1 -->
-										<div class="modal fade" id="curesitem1" tabindex="-1" role="dialog" aria-labelledby="myModalLabel">
-											<div class="modal-dialog" role="document">
-												<div class="modal-content">
-													<div class="modal-header">
-														<button type="button" class="close" data-dismiss="modal" aria-label="Close">
-															<span aria-hidden="true">&times;</span>
-														</button>
-														<h4 class="modal-title" id="myModalLabel">
-															Cure Item 1
-														</h4>
-													</div>
-													<div class="modal-body">
-													<div class="row">
-														<div class="col-xs-8">
-															This is a discription of the first item. Maybe an image there ->?
+									
+										<?php
+											if ($stmt4->num_rows !=0)
+											{
+												$i = 0;
+												$ci_array2 = explode(",", $ci_array);
+												while($rows = $stmt4->fetch_assoc())
+												{
+													$item_id = $rows['item_id'];
+													$item_name = $rows['name'];
+													$item_description= $rows['description'];
+													$item_cmd = $rows['cmd'];
+													
+													if($ci_array2[$i] == '1')
+													{
+													echo'
+													<div class="col-xs-4">
+													<button type="button" class="btn btn-primary btn-group-justified" data-toggle="modal" data-target="#'.$item_id.'">'.$item_name.'</button>
+														<!-- '.$item_name.' -->
+														<div class="modal fade" id="'.$item_id.'" tabindex="-1" role="dialog" aria-labelledby="myModalLabel">
+															<div class="modal-dialog" role="document">
+																<div class="modal-content">
+																	<div class="modal-header">
+																		<button type="button" class="close" data-dismiss="modal" aria-label="Close">
+																			<span aria-hidden="true">&times;</span>
+																		</button>
+																		<h4 class="modal-title" id="myModalLabel">
+																			'.$item_name.'
+																		</h4>
+																	</div>
+																	<div class="modal-body">
+																		<div class="row">
+																			<div class="col-xs-8">
+																				'.$item_description.'
+																				<input type="text" hidden="true" value="'.$item_id.'"
+																			</div>
+																			<div class="col-xs-4">
+																				<img src="/tcinet/Images/logo.png" style="width: 100%;">
+																			</div>
+																		</div>
+																	</div>
+																	<div class="modal-footer">
+																		<button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+																	</div>
+																	</div>
+																</div>
+															</div>
 														</div>
-														<div class="col-xs-4">
-															<img src="/tcinet/Images/logo.png" style="width: 100%;">
-														</div>
-													</div>
-													<div class="modal-footer">
-														<button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
-													</div>
-													</div>
-												</div>
-											</div>
-										</div>
-									</div>
-									<div class="col-xs-4">
-										<button type="button" class="btn btn-group-justified" data-toggle="modal" data-target="#curesitem2"><span class="glyphicon glyphicon-apple"></span></button>
-										<!-- Modal Cure Item 2 -->
-										<div class="modal fade" id="curesitem2" tabindex="-1" role="dialog" aria-labelledby="myModalLabel">
-											<div class="modal-dialog" role="document">
-												<div class="modal-content">
-													<div class="modal-header">
-														<button type="button" class="close" data-dismiss="modal" aria-label="Close">
-															<span aria-hidden="true">&times;</span>
-														</button>
-														<h4 class="modal-title" id="myModalLabel">
-															Cure Item 2
-														</h4>
-													</div>
-													<div class="modal-body">
-													<div class="row">
-														<div class="col-xs-8">
-															This one is not unlocked yet!!!
-														</div>
-														<div class="col-xs-4">
-															<img src="/tcinet/Images/Carousel_Placeholder.png" style="width: 100%;">
-														</div>
-													</div>
-													<div class="modal-footer">
-														<button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
-													</div>
-													</div>
-												</div>
-											</div>
-										</div>
-									</div>
-									<div class="col-xs-4">
-										<button type="button" class="btn btn-group-justified" data-toggle="modal" data-target="#curesitem3"><span class="glyphicon glyphicon-apple"></span></button>
-										<!-- Modal Cure Item 3 -->
-										<div class="modal fade" id="curesitem3" tabindex="-1" role="dialog" aria-labelledby="myModalLabel">
-											<div class="modal-dialog" role="document">
-												<div class="modal-content">
-													<div class="modal-header">
-														<button type="button" class="close" data-dismiss="modal" aria-label="Close">
-															<span aria-hidden="true">&times;</span>
-														</button>
-														<h4 class="modal-title" id="myModalLabel">
-															Cure Item 3
-														</h4>
-													</div>
-													<div class="modal-body">
-													<div class="row">
-														<div class="col-xs-8">
-															This one is not unlocked yet!!!
-														</div>
-														<div class="col-xs-4">
-															<img src="/tcinet/Images/Carousel_Placeholder.png" style="width: 100%;">
-														</div>
-													</div>
-													<div class="modal-footer">
-														<button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
-													</div>
-													</div>
-												</div>
-											</div>
-										</div>
-									</div>
-									<div class="col-xs-4">
-										<button type="button" class="btn btn-group-justified" data-toggle="modal" data-target="#curesitem4"><span class="glyphicon glyphicon-apple"></span></button>
-										<!-- Modal Cure Item 4 -->
-										<div class="modal fade" id="curesitem4" tabindex="-1" role="dialog" aria-labelledby="myModalLabel">
-											<div class="modal-dialog" role="document">
-												<div class="modal-content">
-													<div class="modal-header">
-														<button type="button" class="close" data-dismiss="modal" aria-label="Close">
-															<span aria-hidden="true">&times;</span>
-														</button>
-														<h4 class="modal-title" id="myModalLabel">
-															Cure Item 4
-														</h4>
-													</div>
-													<div class="modal-body">
-													<div class="row">
-														<div class="col-xs-8">
-															This one is not unlocked yet!!!
-														</div>
-														<div class="col-xs-4">
-															<img src="/tcinet/Images/Carousel_Placeholder.png" style="width: 100%;">
-														</div>
-													</div>
-													<div class="modal-footer">
-														<button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
-													</div>
-													</div>
-												</div>
-											</div>
-										</div>
-									</div>
-									<div class="col-xs-4">
-										<button type="button" class="btn btn-group-justified" data-toggle="modal" data-target="#curesitem5"><span class="glyphicon glyphicon-apple"></span></button>
-										<!-- Modal Cure Item 5 -->
-										<div class="modal fade" id="curesitem5" tabindex="-1" role="dialog" aria-labelledby="myModalLabel">
-											<div class="modal-dialog" role="document">
-												<div class="modal-content">
-													<div class="modal-header">
-														<button type="button" class="close" data-dismiss="modal" aria-label="Close">
-															<span aria-hidden="true">&times;</span>
-														</button>
-														<h4 class="modal-title" id="myModalLabel">
-															Cure Item 5
-														</h4>
-													</div>
-													<div class="modal-body">
-													<div class="row">
-														<div class="col-xs-8">
-															This one is not unlocked yet!!!
-														</div>
-														<div class="col-xs-4">
-															<img src="/tcinet/Images/Carousel_Placeholder.png" style="width: 100%;">
-														</div>
-													</div>
-													<div class="modal-footer">
-														<button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
-													</div>
-													</div>
-												</div>
-											</div>
-										</div>
-									</div>
-									<div class="col-xs-4">
-										<button type="button" class="btn btn-group-justified" data-toggle="modal" data-target="#curesitem6"><span class="glyphicon glyphicon-apple"></span></button>
-										<!-- Modal Cure Item 6 -->
-										<div class="modal fade" id="curesitem6" tabindex="-1" role="dialog" aria-labelledby="myModalLabel">
-											<div class="modal-dialog" role="document">
-												<div class="modal-content">
-													<div class="modal-header">
-														<button type="button" class="close" data-dismiss="modal" aria-label="Close">
-															<span aria-hidden="true">&times;</span>
-														</button>
-														<h4 class="modal-title" id="myModalLabel">
-															Cure Item 6
-														</h4>
-													</div>
-													<div class="modal-body">
-													<div class="row">
-														<div class="col-xs-8">
-															This one is not unlocked yet!!!
-														</div>
-														<div class="col-xs-4">
-															<img src="/tcinet/Images/Carousel_Placeholder.png" style="width: 100%;">
-														</div>
-													</div>
-													<div class="modal-footer">
-														<button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
-													</div>
-													</div>
-												</div>
-											</div>
-										</div>
-									</div>
-									<div class="col-xs-4">
-										<button type="button" class="btn btn-group-justified" data-toggle="modal" data-target="#curesitem7"><span class="glyphicon glyphicon-apple"></span></button>
-										<!-- Modal Cure Item 7 -->
-										<div class="modal fade" id="curesitem7" tabindex="-1" role="dialog" aria-labelledby="myModalLabel">
-											<div class="modal-dialog" role="document">
-												<div class="modal-content">
-													<div class="modal-header">
-														<button type="button" class="close" data-dismiss="modal" aria-label="Close">
-															<span aria-hidden="true">&times;</span>
-														</button>
-														<h4 class="modal-title" id="myModalLabel">
-															Cure Item 7
-														</h4>
-													</div>
-													<div class="modal-body">
-													<div class="row">
-														<div class="col-xs-8">
-															This one is not unlocked yet!!!
-														</div>
-														<div class="col-xs-4">
-															<img src="/tcinet/Images/Carousel_Placeholder.png" style="width: 100%;">
-														</div>
-													</div>
-													<div class="modal-footer">
-														<button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
-													</div>
-													</div>
-												</div>
-											</div>
-										</div>
-									</div>
+													</div>';
+													}
+													if($ci_array2[$i] == '0')
+													{
+														echo '<div class="col-xs-4"><button type="button" class="btn btn-default btn-group-justified" disabled>Not Found</button></div>';
+													}
+													$i++;
+												}
+											}
+										?>
+										
+									
 								</div>
 							</div>
 							<!-- Player Menu -->
@@ -434,9 +449,16 @@ sec_session_start();
 			</div>
 		</div>
 	</div>
+	<!-- monster stats  -->
+<input type="text" name="monster_hp" id="monster_hp" value="<?php echo $monster_hp; ?>" hidden="true">
+<input type="text" name="monster_attack" id="monster_attack" value="<?php echo $monster_attack; ?>" hidden="true">
+<input type="text" name="monster_item" id="monster_item" value="<?php echo $monster_item; ?>" hidden="true">
+<!-- game form -->
+
 <?php 
+	
 	else : 
-	echo('<h1>Time is money and money is time! Server sessions are expensive so you can log back on because we terminated your game... selfish.</h1>');
+	echo('<h1>Time is money and money is time! Server sessions are expensive so you can <a href="./cobra_login.php">log back on</a> because we terminated your game... selfish.</h1>');
 	endif; 
 ?>
 </body>
